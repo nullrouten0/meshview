@@ -8,6 +8,7 @@
     "map": "Mapa en Vivo",
     "stats": "Estadísticas",
     "top": "Nodos con Mayor Tráfico",
+    "tracelive": "Traceroutes en Vivo",
     "footer": "Visita <strong><a href=\"https://github.com/pablorevilla-meshtastic/meshview\">Meshview</a></strong> en Github.",
     "node_id": "ID de Nodo",
     "go_to_node": "Ir al nodo",

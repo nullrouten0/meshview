@@ -307,6 +307,7 @@ stats = True
 net = True
 map = True
 top = True
+tracelive = True
 # Show the API documentation link in the navigation bar (default: True).
 api = True
 

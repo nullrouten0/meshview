@@ -8,6 +8,7 @@
         "map": "Живая карта",
         "stats": "Статистика",
         "top": "Крупнейшие ноды трафика",
+        "tracelive": "Трассировки в реальном времени",
         "footer": "Посетите <strong><a href=\"https://github.com/pablorevilla-meshtastic/meshview\">Meshview</a></strong> на GitHub",
         "node id": "ID ноды",
         "go to node": "Перейти к ноде",

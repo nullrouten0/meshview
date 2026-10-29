@@ -8,6 +8,7 @@
       "map": "Live Map",
       "stats": "Stats",
       "top": "Top Traffic Nodes",
+      "tracelive": "Live Traceroutes",
       "footer": "Visit <strong><a href=\"https://github.com/pablorevilla-meshtastic/meshview\">Meshview</a></strong> on GitHub",
       "node id": "Node id",
       "go to node": "Go to Node",

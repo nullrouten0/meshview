@@ -567,6 +567,75 @@ Response Example
 packet IDs return HTTP 404. Invalid integer IDs and storage failures can return
 HTTP 500; this handler does not implement a separate HTTP 400 validation branch.
 
+### GET `/api/traceroutes`
+Returns every traceroute observation of a recent window, for the live traceroute page
+(`/tracelive`). Poll it with `after` to get only new rows.
+
+Query Parameters
+- `minutes` (optional, int): Window length, clamped to 1-180. Default 30.
+- `after` (optional, int): Return only rows with an `id` greater than this, as given by
+  `last_id` of the previous answer.
+- `channel` (optional, string): Only traceroutes on this channel. `all` or empty means
+  every channel.
+
+Each entry is one gateway's observation of a request or a response. Entries of one
+traceroute share `packet_id`, the request's packet ID; `reply_packet_id` is the response's
+own packet ID, or `null` for a request. A response that does not name its request (its
+`request_id` is 0) keeps its own ID in `packet_id`.
+
+`from` and `to` are the initiator and target, for requests and responses alike. `towards`
+runs from the initiator to the target, or to the uplinking gateway while the request is
+still under way. `back` runs from the target to the initiator, or to the uplinking gateway
+while the response is still under way, and is `null` when the response carries no return
+trip. SNR values are in dB, `null` when unknown. `nodes` gives names and roles of the
+known nodes on these paths. An answer holds at most 5000 entries, oldest first; ask again
+with `after=last_id` for the rest.
+
+Response Example
+```json
+{
+  "now": 1793315491.6,
+  "last_id": 3329631,
+  "traceroutes": [
+    {
+      "id": 3329630,
+      "packet_id": 123,
+      "reply_packet_id": null,
+      "time": 1793315480.1,
+      "from": 111,
+      "to": 222,
+      "gateway": 333,
+      "done": false,
+      "towards": [111, 444, 333],
+      "back": null,
+      "snr_towards": [6.25],
+      "snr_back": []
+    },
+    {
+      "id": 3329631,
+      "packet_id": 123,
+      "reply_packet_id": 456,
+      "time": 1793315489.1,
+      "from": 111,
+      "to": 222,
+      "gateway": 111,
+      "done": true,
+      "towards": [111, 444, 222],
+      "back": [222, 444, 111],
+      "snr_towards": [6.25, 4.5],
+      "snr_back": [5.0, 7.25]
+    }
+  ],
+  "nodes": {
+    "111": { "short": "ABCD", "long": "Example node", "role": "CLIENT" }
+  }
+}
+```
+
+---
+
+Invalid integer parameters return HTTP 400.
+
 ## 10. Health API
 
 ### GET `/health`

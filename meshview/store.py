@@ -189,6 +189,40 @@ async def get_traceroutes(since):
             yield tr
 
 
+# Rows per /api/traceroutes answer. Real traffic stays far below it (108 rows in 3 hours of
+# bay-area traffic); after a flood the live page asks again from the last row it got.
+MAX_LIVE_TRACEROUTE_ROWS = 5000
+
+# Node ids per query. SQLite (by default) and asyncpg refuse more than 32,766 and 32,767 bound
+# parameters, and a window of forged traceroutes can name far more nodes than that.
+NODE_ID_BATCH = 1000
+
+
+async def get_traceroutes_live(since_us, after_id=None, channel=None):
+    """Traceroute rows newer than since_us (and than row id after_id), oldest first."""
+    async with database.async_session() as session:
+        stmt = select(Traceroute).where(Traceroute.import_time_us > since_us)
+        if after_id is not None:
+            stmt = stmt.where(Traceroute.id > after_id)
+        if channel:
+            stmt = stmt.join(Packet, Packet.id == Traceroute.packet_id).where(
+                Packet.channel == channel
+            )
+        result = await session.execute(stmt.order_by(Traceroute.id).limit(MAX_LIVE_TRACEROUTE_ROWS))
+        return result.scalars().all()
+
+
+async def get_nodes_by_ids(node_ids):
+    node_ids = list(node_ids)
+    nodes = []
+    async with database.async_session() as session:
+        for i in range(0, len(node_ids), NODE_ID_BATCH):
+            batch = node_ids[i : i + NODE_ID_BATCH]
+            result = await session.execute(select(Node).where(Node.node_id.in_(batch)))
+            nodes.extend(result.scalars().all())
+    return nodes
+
+
 async def get_mqtt_neighbors(since):
     now_us = int(datetime.now().timestamp() * 1_000_000)
     start_us = now_us - int(since.total_seconds() * 1_000_000)

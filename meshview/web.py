@@ -357,6 +357,23 @@ async def stats(request):
     )
 
 
+@routes.get("/tracelive")
+@routes.get("/tracelive/{minutes}")
+async def tracelive(request):
+    # Window from /tracelive/N or /tracelive?minutes=N, 1-180 minutes
+    raw = request.match_info.get("minutes") or request.query.get("minutes") or "30"
+    try:
+        minutes = max(1, min(int(raw), api.MAX_LIVE_TRACEROUTE_MINUTES))
+    except ValueError:
+        minutes = 30
+    channel = request.query.get("channel") or "all"
+    template = env.get_template("tracelive.html")
+    return web.Response(
+        text=template.render(minutes=minutes, channel=channel),
+        content_type="text/html",
+    )
+
+
 @routes.get("/traceroute/{packet_id}")
 async def traceroute_page(request):
     template = env.get_template("traceroute.html")

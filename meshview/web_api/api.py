@@ -785,6 +785,7 @@ async def api_config(request):
             "net": get_bool(site, "net", True),
             "map": get_bool(site, "map", True),
             "top": get_bool(site, "top", True),
+            "tracelive": get_bool(site, "tracelive", True),
             "api": get_bool(site, "api", True),
             "map_top_left_lat": get_float(site, "map_top_left_lat", 39.0),
             "map_top_left_lon": get_float(site, "map_top_left_lon", -123.0),
@@ -1118,6 +1119,106 @@ async def api_traceroute(request):
             "unique_forward_paths": unique_forward_paths_json,
             "unique_reverse_paths": unique_reverse_paths_json,
             "winning_paths": winning_paths_json,
+        }
+    )
+
+
+# Longest window the live traceroute page can show.
+MAX_LIVE_TRACEROUTE_MINUTES = 180
+
+
+def _snr_list(values):
+    """SNR values as dB. They are stored as dB * 4; -128 means unknown."""
+    return [None if v == -128 else v / 4 for v in values]
+
+
+@routes.get("/api/traceroutes")
+async def api_traceroutes(request):
+    """Traceroute rows of the last `minutes`, or only those after row id `after` (polling).
+
+    Request and response rows of one traceroute share `packet_id` (the request's id), so the
+    page can group them. `towards` runs from the node that started the traceroute to the
+    target, or to the gateway that uplinked a request still under way. `back` runs from the
+    target to the initiator, or to the gateway that uplinked a response still under way, and
+    is null when the response carries no return trip.
+    """
+    minutes = _query_int(request, "minutes", 30, 1, MAX_LIVE_TRACEROUTE_MINUTES)
+    after = _query_int(request, "after")
+    channel = request.query.get("channel") or None
+    if channel == "all":
+        channel = None
+
+    now = datetime.datetime.now().timestamp()
+    since_us = int((now - minutes * 60) * 1_000_000)
+
+    rows = []
+    node_ids = set()
+    last_id = after
+    for tr in await store.get_traceroutes_live(since_us, after, channel):
+        last_id = tr.id
+        packet = tr.packet
+        # Skip rows that cannot be drawn; one bad row must not stop the feed.
+        if packet is None or tr.route is None:
+            continue
+        route = decode_payload.decode_payload(PortNum.TRACEROUTE_APP, tr.route)
+        if route is None:
+            continue
+
+        initiator, target = traceroute.endpoints(packet.from_node_id, packet.to_node_id, tr.done)
+        towards = traceroute.forward_path(
+            packet.from_node_id, packet.to_node_id, route.route, tr.done, tr.gateway_node_id
+        )
+        back = None
+        request_id = packet.id
+        if tr.done:
+            # Responses are stored under their own id; request_id names the request.
+            # Often 0 (99 of 155 bay-area responses in a day); those are grouped on their own.
+            mesh_packet = None
+            if packet.payload is not None:
+                mesh_packet, _ = decode_payload.decode(packet)
+            if mesh_packet is not None and mesh_packet.decoded.request_id:
+                request_id = mesh_packet.decoded.request_id
+            # A response without return-trip fields has no way back to draw.
+            if route.route_back or route.snr_back:
+                complete = traceroute.return_is_complete(route)
+                back = traceroute.return_path(
+                    packet.from_node_id, packet.to_node_id, route.route_back, complete
+                )
+                # A response still on its way is drawn up to the gateway that heard it.
+                gateway = tr.gateway_node_id
+                if not complete and gateway is not None and (not back or back[-1] != gateway):
+                    back.append(gateway)
+
+        node_ids.update(towards)
+        node_ids.update(back or [])
+        rows.append(
+            {
+                "id": tr.id,
+                "packet_id": request_id,
+                "reply_packet_id": packet.id if tr.done else None,
+                "time": tr.import_time_us / 1_000_000 if tr.import_time_us else now,
+                "from": initiator,
+                "to": target,
+                "gateway": tr.gateway_node_id,
+                "done": bool(tr.done),
+                "towards": towards,
+                "back": back,
+                "snr_towards": _snr_list(route.snr_towards),
+                "snr_back": _snr_list(route.snr_back),
+            }
+        )
+
+    nodes = {}
+    if node_ids:
+        for n in await store.get_nodes_by_ids(node_ids):
+            nodes[n.node_id] = {"short": n.short_name, "long": n.long_name, "role": n.role}
+
+    return web.json_response(
+        {
+            "now": now,
+            "last_id": last_id,
+            "traceroutes": rows,
+            "nodes": nodes,
         }
     )
 

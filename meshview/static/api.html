@@ -117,7 +117,7 @@ body { background:var(--mesh-page); color:var(--mesh-text); }
 <body>
 <header><div class="header-inner"><a class="brand" href="/"><img src="/static/meshview-icon.svg" alt="" width="32" height="32">Meshview</a><span>API reference</span><a class="home-link" href="/">Home ↗</a><button class="mesh-theme-toggle" type="button" data-theme-toggle aria-label="Switch to night mode" aria-pressed="false"><svg class="theme-icon theme-icon--sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg><svg class="theme-icon theme-icon--moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.9 13A9 9 0 0 1 11 3.1 9 9 0 1 0 20.9 13Z"/></svg></button></div></header>
 <main>
-<details class="api-index"><summary>Browse all 16 endpoints</summary><nav aria-label="API endpoints"><ul><li><a href="#get-api-nodes">GET /api/nodes</a></li><li><a href="#get-api-packets">GET /api/packets</a></li><li><a href="#get-api-channels">GET /api/channels</a></li><li><a href="#get-api-stats">GET /api/stats</a></li><li><a href="#get-api-stats-count">GET /api/stats/count</a></li><li><a href="#get-api-stats-top">GET /api/stats/top</a></li><li><a href="#get-api-edges">GET /api/edges</a></li><li><a href="#get-api-snapshots-daily">GET /api/snapshots/daily</a></li><li><a href="#get-api-config">GET /api/config</a></li><li><a href="#get-api-lang">GET /api/lang</a></li><li><a href="#get-api-packets-seen-packet-id">GET /api/packets_seen/{packet_id}</a></li><li><a href="#get-api-traceroute-packet-id">GET /api/traceroute/{packet_id}</a></li><li><a href="#get-health">GET /health</a></li><li><a href="#get-version">GET /version</a></li><li><a href="#get-api-node-node-id-qr">GET /api/node/{node_id}/qr</a></li><li><a href="#get-api-coverage-node-id">GET /api/coverage/{node_id}</a></li></ul></nav></details>
+<details class="api-index"><summary>Browse all 17 endpoints</summary><nav aria-label="API endpoints"><ul><li><a href="#get-api-nodes">GET /api/nodes</a></li><li><a href="#get-api-packets">GET /api/packets</a></li><li><a href="#get-api-channels">GET /api/channels</a></li><li><a href="#get-api-stats">GET /api/stats</a></li><li><a href="#get-api-stats-count">GET /api/stats/count</a></li><li><a href="#get-api-stats-top">GET /api/stats/top</a></li><li><a href="#get-api-edges">GET /api/edges</a></li><li><a href="#get-api-snapshots-daily">GET /api/snapshots/daily</a></li><li><a href="#get-api-config">GET /api/config</a></li><li><a href="#get-api-lang">GET /api/lang</a></li><li><a href="#get-api-packets-seen-packet-id">GET /api/packets_seen/{packet_id}</a></li><li><a href="#get-api-traceroute-packet-id">GET /api/traceroute/{packet_id}</a></li><li><a href="#get-api-traceroutes">GET /api/traceroutes</a></li><li><a href="#get-health">GET /health</a></li><li><a href="#get-version">GET /version</a></li><li><a href="#get-api-node-node-id-qr">GET /api/node/{node_id}/qr</a></li><li><a href="#get-api-coverage-node-id">GET /api/coverage/{node_id}</a></li></ul></nav></details>
 <h1 id="api-documentation">API Documentation</h1>
 <p>Base URL: <code>http(s)://&lt;host&gt;</code></p>
 <p>This reference covers all 16 GET routes registered in <code>meshview/web_api/api.py</code>, including <code>/health</code> and <code>/version</code>. The browser version is served at <code>/api.html</code>. Responses below are illustrative examples; actual values depend on stored data. Regenerate the browser reference after editing this file with <code>node scripts/build-api-docs.mjs</code>.</p>
@@ -422,6 +422,53 @@ LocalChat = #18aa18</code></pre>
 }</code></pre>
 <hr>
 <p><code>traceroute_packets</code> can be empty even when the packet exists. Unknown database packet IDs return HTTP 404. Invalid integer IDs and storage failures can return HTTP 500; this handler does not implement a separate HTTP 400 validation branch.</p>
+</section>
+<section class="endpoint" id="get-api-traceroutes"><h3><span class="method">GET</span> <code>/api/traceroutes</code></h3>
+<p>Returns every traceroute observation of a recent window, for the live traceroute page (<code>/tracelive</code>). Poll it with <code>after</code> to get only new rows.</p>
+<p>Query Parameters</p>
+<ul><li><code>minutes</code> (optional, int): Window length, clamped to 1-180. Default 30.</li><li><code>after</code> (optional, int): Return only rows with an <code>id</code> greater than this, as given by <code>last_id</code> of the previous answer.</li><li><code>channel</code> (optional, string): Only traceroutes on this channel. <code>all</code> or empty means every channel.</li></ul>
+<p>Each entry is one gateway&#39;s observation of a request or a response. Entries of one traceroute share <code>packet_id</code>, the request&#39;s packet ID; <code>reply_packet_id</code> is the response&#39;s own packet ID, or <code>null</code> for a request. A response that does not name its request (its <code>request_id</code> is 0) keeps its own ID in <code>packet_id</code>.</p>
+<p><code>from</code> and <code>to</code> are the initiator and target, for requests and responses alike. <code>towards</code> runs from the initiator to the target, or to the uplinking gateway while the request is still under way. <code>back</code> runs from the target to the initiator, or to the uplinking gateway while the response is still under way, and is <code>null</code> when the response carries no return trip. SNR values are in dB, <code>null</code> when unknown. <code>nodes</code> gives names and roles of the known nodes on these paths. An answer holds at most 5000 entries, oldest first; ask again with <code>after=last_id</code> for the rest.</p>
+<p>Response Example</p>
+<pre><code class="language-json">{
+  &quot;now&quot;: 1793315491.6,
+  &quot;last_id&quot;: 3329631,
+  &quot;traceroutes&quot;: [
+    {
+      &quot;id&quot;: 3329630,
+      &quot;packet_id&quot;: 123,
+      &quot;reply_packet_id&quot;: null,
+      &quot;time&quot;: 1793315480.1,
+      &quot;from&quot;: 111,
+      &quot;to&quot;: 222,
+      &quot;gateway&quot;: 333,
+      &quot;done&quot;: false,
+      &quot;towards&quot;: [111, 444, 333],
+      &quot;back&quot;: null,
+      &quot;snr_towards&quot;: [6.25],
+      &quot;snr_back&quot;: []
+    },
+    {
+      &quot;id&quot;: 3329631,
+      &quot;packet_id&quot;: 123,
+      &quot;reply_packet_id&quot;: 456,
+      &quot;time&quot;: 1793315489.1,
+      &quot;from&quot;: 111,
+      &quot;to&quot;: 222,
+      &quot;gateway&quot;: 111,
+      &quot;done&quot;: true,
+      &quot;towards&quot;: [111, 444, 222],
+      &quot;back&quot;: [222, 444, 111],
+      &quot;snr_towards&quot;: [6.25, 4.5],
+      &quot;snr_back&quot;: [5.0, 7.25]
+    }
+  ],
+  &quot;nodes&quot;: {
+    &quot;111&quot;: { &quot;short&quot;: &quot;ABCD&quot;, &quot;long&quot;: &quot;Example node&quot;, &quot;role&quot;: &quot;CLIENT&quot; }
+  }
+}</code></pre>
+<hr>
+<p>Invalid integer parameters return HTTP 400.</p>
 </section>
 <h2 id="10-health-api">10. Health API</h2>
 <section class="endpoint" id="get-health"><h3><span class="method">GET</span> <code>/health</code></h3>
